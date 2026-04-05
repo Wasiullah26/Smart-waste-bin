@@ -1,0 +1,223 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Fog-assisted smart waste bin — HTTP ingestion → SQS → Lambda → DynamoDB (events + latest).
+  Designed for academic / AWS Learner Lab deployment via local `sam build` + `sam deploy`.
+
+# AWS Learner Lab / Academy accounts often CANNOT create IAM roles (iam:CreateRole denied).
+# Use one existing execution role for all Lambdas (usually "LabRole" — see backend/README.md).
+Parameters:
+  LambdaExecutionRoleArn:
+    Type: String
+    Description: >
+      ARN of an existing IAM role for Lambda (required in Learner Lab). Example arn:aws:iam::123456789012:role/LabRole
+  AdminApiKey:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. If non-empty, POST /admin/purge requires header X-Admin-Key matching this value. Leave empty for class demos only.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+    Timeout: 30
+    MemorySize: 256
+    Tracing: Active
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+
+  # New physical name so CloudFormation can drop the old `waste-bin-events` table
+  # (event_ts) and create this one (event_sk) without the "custom-named replace" error.
+  WasteBinEventsTableV2:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: waste-bin-events-v2
+      AttributeDefinitions:
+        - AttributeName: bin_id
+          AttributeType: S
+        - AttributeName: event_sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bin_id
+          KeyType: HASH
+        - AttributeName: event_sk
+          KeyType: RANGE
+
+  WasteBinLatestTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: waste-bin-latest
+      AttributeDefinitions:
+        - AttributeName: bin_id
+          AttributeType: S
+        - AttributeName: zone
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bin_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ZoneBinIndex
+          KeySchema:
+            - AttributeName: zone
+              KeyType: HASH
+            - AttributeName: bin_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  IngestionDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+
+  IngestionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt IngestionDLQ.Arn
+        maxReceiveCount: 5
+
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Role: !Ref LambdaExecutionRoleArn
+      Description: Accept HTTPS POST from fog, validate JSON, enqueue to SQS
+      CodeUri: ingestion/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref IngestionQueue
+      # Policies omitted: execution permissions come from LambdaExecutionRoleArn (LabRole).
+      Events:
+        IngestApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /ingest
+            Method: POST
+
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Role: !Ref LambdaExecutionRoleArn
+      Description: Persist events and upsert latest bin state
+      CodeUri: processor/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref WasteBinEventsTableV2
+          LATEST_TABLE: !Ref WasteBinLatestTable
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt IngestionQueue.Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 2
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  ReadApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Role: !Ref LambdaExecutionRoleArn
+      Description: Read API for dashboard (bins, zones, critical, history)
+      CodeUri: read_api/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref WasteBinEventsTableV2
+          LATEST_TABLE: !Ref WasteBinLatestTable
+          ZONE_GSI_NAME: ZoneBinIndex
+      Events:
+        GetBins:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /bins
+            Method: GET
+        GetBinById:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /bins/{bin_id}
+            Method: GET
+        GetBinsByZone:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /zones/{zone}/bins
+            Method: GET
+        GetCritical:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /critical
+            Method: GET
+        GetHistory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /history/{bin_id}
+            Method: GET
+
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Role: !Ref LambdaExecutionRoleArn
+      Description: Purge DynamoDB + SQS for lab reset (POST /admin/purge)
+      CodeUri: admin/
+      Handler: app.lambda_handler
+      Timeout: 120
+      MemorySize: 512
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref WasteBinEventsTableV2
+          LATEST_TABLE: !Ref WasteBinLatestTable
+          QUEUE_URL: !Ref IngestionQueue
+          ADMIN_API_KEY: !Ref AdminApiKey
+      Events:
+        AdminPurge:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /admin/purge
+            Method: POST
+
+Outputs:
+  HttpApiUrl:
+    Description: Invoke URL for the HTTP API (append /ingest, /bins, etc.)
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  IngestionQueueUrl:
+    Description: SQS queue URL (for debugging)
+    Value: !Ref IngestionQueue
+  WasteBinEventsTableName:
+    Value: !Ref WasteBinEventsTableV2
+  WasteBinLatestTableName:
+    Value: !Ref WasteBinLatestTable

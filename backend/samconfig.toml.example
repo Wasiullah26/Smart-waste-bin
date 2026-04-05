@@ -1,0 +1,21 @@
+# Copy to samconfig.toml and adjust (samconfig.toml is gitignored).
+# Get LabRole ARN: IAM console → Roles → LabRole, or:
+#   aws iam list-roles --query "Roles[?contains(RoleName, 'Lab')].[Arn]" --output text
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "smart-waste-bin"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+# Optional: AdminApiKey=your-secret (requires X-Admin-Key / VITE_ADMIN_API_KEY). Leave unset for empty key.
+parameter_overrides = "LambdaExecutionRoleArn=arn:aws:iam::REPLACE_ACCOUNT_ID:role/LabRole"

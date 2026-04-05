@@ -1,0 +1,4 @@
+# Fog uplink + local tooling
+requests>=2.31.0
+
+# Note: AWS Lambda runtimes include boto3; no need to vendor it for deployed functions.

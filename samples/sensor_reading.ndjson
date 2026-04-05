@@ -1,0 +1,2 @@
+{"bin_id": "BIN-zone-A-01", "zone": "zone-A", "fill_level": 42.5, "weight_kg": 51.2, "temperature_c": 22.3, "usage_count": 7, "timestamp": 1712345678.9}
+{"bin_id": "BIN-zone-B-02", "zone": "zone-B", "fill_level": 88.0, "weight_kg": 98.1, "temperature_c": 24.0, "usage_count": 12, "timestamp": 1712345689.1}

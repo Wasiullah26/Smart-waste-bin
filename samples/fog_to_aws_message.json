@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "message_type": "summary",
+  "emitted_at": 1712345690.0,
+  "records": [
+    {
+      "bin_id": "BIN-zone-A-01",
+      "zone": "zone-A",
+      "fill_level": 41.2,
+      "weight_kg": 50.1,
+      "temperature_c": 22.1,
+      "usage_rate": 23.33,
+      "priority": 35.12,
+      "status": "normal",
+      "fill_alert": "none",
+      "fire_risk": false,
+      "probable_fire_alert": false,
+      "timestamp": 1712345688.9,
+      "fog_node_id": "fog-1"
+    }
+  ]
+}
