@@ -1,14 +1,20 @@
-# AWS Amplify Hosting — build the Vite dashboard from frontend/
-# Connect this repo in Amplify; set environment variables (see readme.txt → Amplify Hosting).
+# AWS Amplify Hosting — Vite app lives in frontend/
+#
+# Amplify sometimes runs preBuild from repo root and build from frontend/ (or vice versa).
+# Use one shell block so cd persists, and only "cd frontend" when that folder exists.
 version: 1
 frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend && npm ci
+        - |
+          if [ -d frontend ]; then cd frontend; fi
+          npm ci
     build:
       commands:
-        - cd frontend && npm run build
+        - |
+          if [ -d frontend ]; then cd frontend; fi
+          npm run build
   artifacts:
     baseDirectory: frontend/dist
     files:
