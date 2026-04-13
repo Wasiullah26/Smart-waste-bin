@@ -22,3 +22,21 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+
+
+# docs/ — Markdown, Mermaid & plain text (keep README*)
+docs/**/*.md
+docs/**/*.mmd
+docs/**/*.txt
+!docs/**/README.md
+!docs/**/Readme.md
+!docs/**/readme.md
+!docs/**/README.txt
+!docs/**/Readme.txt
+!docs/**/readme.txt
+
+# docs/ — Office lock files
+docs/**/~$*
+
+# docs/report — entire folder (all contents; overrides un-ignore rules above for this path)
+docs/report/
