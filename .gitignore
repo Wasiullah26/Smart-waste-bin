@@ -40,3 +40,8 @@ docs/**/~$*
 
 # docs/report — entire folder (all contents; overrides un-ignore rules above for this path)
 docs/report/
+
+# IoT device certs / keys (keep local only; never commit)
+docs/**/*.pem
+docs/**/*.pem.crt
+docs/**/*.pem.key

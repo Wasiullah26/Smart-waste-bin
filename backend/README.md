@@ -4,8 +4,8 @@ This stack implements:
 
 - **API Gateway (HTTP API)** — `POST /ingest` (fog → SQS), read routes for the dashboard
 - **SQS** — decouples ingestion from persistence
-- **Lambda** — ingestion (enqueue) + processor (DynamoDB) + read API + optional admin purge
-- **DynamoDB** — `waste-bin-events-v2` (history) and `waste-bin-latest` (current state per bin)
+- **Lambda** — ingestion (enqueue) + processor (DynamoDB) + read API + optional admin purge + **IoTFogFunction** (MQTT fog → same SQS queue)
+- **DynamoDB** — `waste-bin-events-v2` (history), `waste-bin-latest` (current state per bin), **`FogStateTable`** (serialized fog state for MQTT Lambda)
 
 **Deployment model:** build and deploy **manually** from your laptop while **AWS Learner Lab** credentials are valid. GitHub Actions only validates/tests — it does **not** deploy (temporary keys rotate ~every 4 hours).
 
@@ -222,6 +222,29 @@ python -m fog --demo --interval 3 --summary-interval 5 \
 
 - `--no-stdout` — only POST (no NDJSON on stdout)
 - `--post-timeout` / `--post-retries` — tune resilience
+
+## MQTT (AWS IoT Core) — edge laptop → fog in AWS
+
+Deploy the stack so **`IoTFogFunction`** and **`FogStateTable`** exist. Stack **Outputs** include **`IoTFogFunctionArn`**.
+
+1. **IoT Core → Rule** (console): SQL **`SELECT * FROM 'waste/edge/readings'`** (topic must match what the edge publishes). Action: **Lambda** → select **IoTFogFunction**. The console adds **Invoke permission** from IoT to Lambda.
+2. **Thing + certificates**: Create a Thing, download the device cert, private key, and [Amazon Root CA 1](https://www.amazontrust.com/repository/AmazonRootCA1.pem). Attach an **IoT policy** that allows `iot:Connect`, `iot:Publish`, and (if needed) `iot:Subscribe` on the ARNs for your account/region.
+3. **Edge (laptop)** from repo root (`PYTHONPATH` set as usual):
+
+```bash
+pip install -r requirements.txt   # includes paho-mqtt for the edge script
+export PYTHONPATH="/path/to/Fog&Edge"
+python scripts/edge_mqtt_publish.py \
+  --endpoint YOUR_ENDPOINT-ats.iot.REGION.amazonaws.com \
+  --ca AmazonRootCA1.pem --cert device.pem.crt --key private.pem.key \
+  --topic waste/edge/readings --interval 2
+```
+
+Each MQTT payload is one **`BinReading`** JSON object (same fields as the NDJSON lines from `python -m sensors`). **IoTFogFunction** runs the same fog logic as `python -m fog`, stores state in **FogStateTable**, and enqueues **`FogOutboundMessage`** JSON to the **same SQS queue** as `POST /ingest`, so the rest of the pipeline is unchanged.
+
+**Learner Lab:** If you cannot create **IoT Rules** or **IAM** roles from CloudFormation, use the console steps above after deploy. Ensure **LabRole** allows **DynamoDB** read/write on **FogStateTable** and **SQS** `SendMessage` on the ingestion queue (it usually does).
+
+**Repo layout:** `backend/iot_fog/fog` and `backend/iot_fog/shared` are **symlinks** to the top-level packages so `sam build` bundles them into **IoTFogFunction** without duplicating code.
 
 ## Data mapping (DynamoDB)
 

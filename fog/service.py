@@ -5,7 +5,7 @@ Fog orchestration: validate → smooth → score → periodic summaries + alert-
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import Any
 
 from fog.events import (
     combine_status,
@@ -46,6 +46,45 @@ class FogProcessingService:
         self._prev: dict[str, tuple[AlertLevel, int]] = {}
         # Latest summary record per bin (full fleet snapshot for periodic uplink)
         self._latest: dict[str, FogSummaryRecord] = {}
+
+    def to_state_dict(self) -> dict[str, Any]:
+        """Serializable snapshot for serverless / DynamoDB persistence."""
+        return {
+            "v": 1,
+            "summary_interval_sec": self.summary_interval_sec,
+            "fog_node_id": self.fog_node_id,
+            "last_summary_emit": self._last_summary_emit,
+            "smoothing": {
+                "window": self._smoothing._window,
+                "bins": self._smoothing.to_dict(),
+            },
+            "prev": {
+                k: [v[0].value, v[1]]
+                for k, v in self._prev.items()
+            },
+            "latest": {k: v.to_dict() for k, v in self._latest.items()},
+        }
+
+    def apply_state_dict(self, d: dict[str, Any]) -> None:
+        """Restore from :meth:`to_state_dict` (same process version)."""
+        if d.get("v") != 1:
+            raise ValueError("unsupported fog state version")
+        self.summary_interval_sec = float(d["summary_interval_sec"])
+        self.fog_node_id = str(d["fog_node_id"])
+        self._last_summary_emit = float(d["last_summary_emit"])
+        sm = d["smoothing"]
+        self._smoothing = SmoothingRegistry.from_dict(
+            sm["bins"],
+            int(sm["window"]),
+        )
+        self._prev = {
+            k: (AlertLevel(a), int(b))
+            for k, (a, b) in d["prev"].items()
+        }
+        self._latest = {
+            k: FogSummaryRecord.from_dict(v)
+            for k, v in d["latest"].items()
+        }
 
     def _to_record(self, s: SmoothedReading) -> FogSummaryRecord:
         fa = fill_alert_level(s.fill_level)

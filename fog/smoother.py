@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from typing import Any
 
 from shared.constants import SMOOTHING_WINDOW
 from shared.models import BinReading
@@ -51,6 +52,25 @@ class PerBinMovingAverage:
             timestamp=r.timestamp,
         )
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "window": self._window,
+            "fill": list(self._fill),
+            "weight": list(self._weight),
+            "temp": list(self._temp),
+            "usage": list(self._usage),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PerBinMovingAverage:
+        window = int(d["window"])
+        obj = cls(window)
+        obj._fill = deque((float(x) for x in d["fill"]), maxlen=obj._window)
+        obj._weight = deque((float(x) for x in d["weight"]), maxlen=obj._window)
+        obj._temp = deque((float(x) for x in d["temp"]), maxlen=obj._window)
+        obj._usage = deque((float(x) for x in d["usage"]), maxlen=obj._window)
+        return obj
+
 
 class SmoothingRegistry:
     """One moving-average filter per bin_id."""
@@ -63,3 +83,13 @@ class SmoothingRegistry:
         if r.bin_id not in self._per_bin:
             self._per_bin[r.bin_id] = PerBinMovingAverage(self._window)
         return self._per_bin[r.bin_id].update(r)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {bid: avg.to_dict() for bid, avg in self._per_bin.items()}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any], window: int) -> SmoothingRegistry:
+        reg = cls(window)
+        for bid, blob in d.items():
+            reg._per_bin[str(bid)] = PerBinMovingAverage.from_dict(blob)
+        return reg

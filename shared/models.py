@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, cast, Literal
 
 
 class AlertLevel(str, Enum):
@@ -76,6 +76,24 @@ class FogSummaryRecord:
         d = asdict(self)
         d["fill_alert"] = self.fill_alert.value
         return d
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> FogSummaryRecord:
+        return cls(
+            bin_id=str(d["bin_id"]),
+            zone=str(d["zone"]),
+            fill_level=float(d["fill_level"]),
+            weight_kg=float(d["weight_kg"]),
+            temperature_c=float(d["temperature_c"]),
+            usage_rate=float(d["usage_rate"]),
+            priority=float(d["priority"]),
+            status=cast(BinStatus, d["status"]),
+            fill_alert=AlertLevel(str(d["fill_alert"])),
+            fire_risk=bool(d["fire_risk"]),
+            probable_fire_alert=bool(d["probable_fire_alert"]),
+            timestamp=float(d["timestamp"]),
+            fog_node_id=str(d.get("fog_node_id", "fog-1")),
+        )
 
 
 @dataclass

@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Fog-assisted smart waste bin — HTTP ingestion → SQS → Lambda → DynamoDB (events + latest).
+  Fog-assisted smart waste bin — HTTP ingestion or MQTT (IoT Core) fog → SQS → Lambda → DynamoDB (events + latest).
   Designed for academic / AWS Learner Lab deployment via local `sam build` + `sam deploy`.
 
 # AWS Learner Lab / Academy accounts often CANNOT create IAM roles (iam:CreateRole denied).
@@ -94,6 +94,34 @@ Resources:
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt IngestionDLQ.Arn
         maxReceiveCount: 5
+
+  # Fog pipeline state for IoT Core (MQTT) → Lambda (same logic as local `python -m fog`).
+  FogStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: fog_node_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: fog_node_id
+          KeyType: HASH
+
+  IoTFogFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !Ref LambdaExecutionRoleArn
+      CodeUri: iot_fog/
+      Handler: app.lambda_handler
+      Description: MQTT (IoT Core) fog processor — DynamoDB state → SQS (same JSON as POST /ingest)
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref IngestionQueue
+          STATE_TABLE_NAME: !Ref FogStateTable
+          FOG_NODE_ID: mqtt-fog-1
+          SUMMARY_INTERVAL_SEC: "5"
 
   IngestFunction:
     Type: AWS::Serverless::Function
@@ -217,6 +245,12 @@ Outputs:
   IngestionQueueUrl:
     Description: SQS queue URL (for debugging)
     Value: !Ref IngestionQueue
+  FogStateTableName:
+    Description: DynamoDB table holding serialized fog state for IoTFogFunction
+    Value: !Ref FogStateTable
+  IoTFogFunctionArn:
+    Description: Lambda ARN — use as IoT Rule action target for MQTT fog (see backend README)
+    Value: !GetAtt IoTFogFunction.Arn
   WasteBinEventsTableName:
     Value: !Ref WasteBinEventsTableV2
   WasteBinLatestTableName:

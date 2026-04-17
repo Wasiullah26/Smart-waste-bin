@@ -48,6 +48,16 @@ HTTPS uplink example (after SAM deploy — see backend/README.md)::
 
   python -m fog --demo --post-url "https://xxxx.execute-api.REGION.amazonaws.com/ingest"
 
+MQTT uplink (edge laptop → AWS IoT Core → IoTFogFunction → same SQS as /ingest)::
+
+  See backend/README.md section "MQTT (AWS IoT Core)". Requires Thing certs + IoT Rule on topic ``waste/edge/readings``.
+
+  With certs under ``docs/`` (see ``scripts/run_edge_mqtt.sh`` for paths), from repo root::
+
+    ./scripts/run_edge_mqtt.sh
+
+  Or call ``python scripts/edge_mqtt_publish.py`` with ``--endpoint``, ``--ca``, ``--cert``, ``--key``, ``--topic waste/edge/readings``.
+
 Sample payloads
 ---------------
 - samples/sensor_reading.ndjson — raw lines the fog expects on stdin.

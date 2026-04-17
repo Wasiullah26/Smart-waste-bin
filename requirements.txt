@@ -1,4 +1,7 @@
 # Fog uplink + local tooling
 requests>=2.31.0
 
+# Edge → AWS IoT Core (MQTT) — scripts/edge_mqtt_publish.py
+paho-mqtt>=1.6.1,<2
+
 # Note: AWS Lambda runtimes include boto3; no need to vendor it for deployed functions.
