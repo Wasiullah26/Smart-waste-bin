@@ -35,7 +35,7 @@ export function CriticalPage() {
           {bins.length === 0 ? (
             <p className="muted">No critical bins right now.</p>
           ) : (
-            bins.map((b) => <BinCard key={b.bin_id} bin={b} />)
+            bins.map((b, i) => <BinCard key={b.bin_id} bin={b} staggerIndex={i} />)
           )}
         </div>
       ) : null}

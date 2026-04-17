@@ -5,6 +5,8 @@
 # Usage (from repo root):
 #   chmod +x scripts/run_edge_mqtt.sh
 #   ./scripts/run_edge_mqtt.sh
+#   ./scripts/run_edge_mqtt.sh --zones zone-A,zone-B --bins-per-zone 5
+#   ./scripts/run_edge_mqtt.sh -- --zones ...   # leading "--" is optional
 #
 # Optional overrides:
 #   export IOT_ENDPOINT="xxxx-ats.iot.us-east-1.amazonaws.com"
@@ -30,6 +32,11 @@ for f in "$CA" "$CERT" "$KEY"; do
     exit 1
   fi
 done
+
+# Allow "./run_edge_mqtt.sh -- --zones ..." — do not pass a lone "--" through to Python.
+if [[ "${1-}" == "--" ]]; then
+  shift
+fi
 
 exec python3 "$ROOT/scripts/edge_mqtt_publish.py" \
   --endpoint "$ENDPOINT" \

@@ -69,7 +69,10 @@ def main() -> None:
         "--zones",
         type=str,
         default="zone-A,zone-B,zone-C",
-        help="Comma-separated zone names (at least 2).",
+        help=(
+            "Comma-separated zone names (at least 2). Default only when this flag is omitted; "
+            "if you pass --zones, only those names are used (not merged with A/B/C)."
+        ),
     )
     parser.add_argument(
         "--seed",
@@ -150,7 +153,7 @@ def main() -> None:
 
     print(
         f"[edge] publishing to topic={args.topic!r} endpoint={args.endpoint!r} "
-        f"zones={len(zones)} bins_per_zone={args.bins_per_zone} total_bins={len(orch.bins)}",
+        f"zones={zones!r} bins_per_zone={args.bins_per_zone} total_bins={len(orch.bins)}",
         file=sys.stderr,
     )
 
