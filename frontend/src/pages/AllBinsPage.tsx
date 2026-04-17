@@ -35,7 +35,7 @@ export function AllBinsPage() {
           {bins.length === 0 ? (
             <p className="muted">No bins to show yet. When your devices send data, they will appear here.</p>
           ) : (
-            bins.map((b) => <BinCard key={b.bin_id} bin={b} />)
+            bins.map((b, i) => <BinCard key={b.bin_id} bin={b} staggerIndex={i} />)
           )}
         </div>
       ) : null}

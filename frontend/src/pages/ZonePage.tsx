@@ -55,8 +55,8 @@ export function ZonePage() {
           {bins.length === 0 ? (
             <p className="muted">No bins in this zone.</p>
           ) : (
-            bins.map((b: BinLatest) => (
-              <BinCard key={b.bin_id} bin={b} />
+            bins.map((b: BinLatest, i: number) => (
+              <BinCard key={b.bin_id} bin={b} staggerIndex={i} />
             ))
           )}
         </div>
