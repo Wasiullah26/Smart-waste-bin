@@ -15,6 +15,9 @@ Example::
     --endpoint xxxxx-ats.iot.REGION.amazonaws.com \\
     --ca AmazonRootCA1.pem --cert device.pem.crt --key private.pem.key \\
     --topic waste/edge/readings --interval 2
+
+  # Print each BinReading JSON line to stdout (demo / supervisor review):
+  # ... same flags ... --print-payload
 """
 
 from __future__ import annotations
@@ -95,6 +98,12 @@ def main() -> None:
         action="store_true",
         help="Do not print a line after each publish round (errors still print).",
     )
+    parser.add_argument(
+        "--print-payload",
+        action="store_true",
+        dest="print_payload",
+        help="Print each MQTT payload (BinReading JSON, one line per publish) to stdout.",
+    )
     args = parser.parse_args()
 
     for p, label in (
@@ -164,6 +173,8 @@ def main() -> None:
             n_pub = 0
             for reading in orch.all_readings_tick():
                 payload = json.dumps(reading.to_dict())
+                if args.print_payload:
+                    print(payload, flush=True)
                 info = client.publish(args.topic, payload, qos=1)
                 n_pub += 1
                 if info.rc != mqtt.MQTT_ERR_SUCCESS:

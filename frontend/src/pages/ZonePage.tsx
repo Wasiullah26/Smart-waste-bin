@@ -36,7 +36,7 @@ export function ZonePage() {
         <span className="mono">{decoded}</span>
       </nav>
       <header className="page__hero">
-        <h1 className="page__title">Zone {decoded}</h1>
+        <h1 className="page__title">Zone: {decoded}</h1>
         <p className="page__lead">Bins located in this zone.</p>
         {lastUpdated ? (
           <p className="page__updated mono">
