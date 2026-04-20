@@ -28,8 +28,20 @@ export function Layout() {
     try {
       const out = await postAdminPurge();
       dispatchDashboardRefetch();
+      const latest = out.deleted_latest ?? 0;
+      const events = out.deleted_events ?? 0;
+      const fog = out.deleted_fog_state;
+      const fogNote =
+        typeof fog === "number"
+          ? ` Cleared ${fog} MQTT fog state row(s) (prevents old zones from reappearing after summary).`
+          : "";
+      const sqsNote = out.sqs_purged ? " Ingestion queue purged." : "";
+      const mismatchHint =
+        latest === 0 && events === 0
+          ? " If bins were still visible before this, VITE_API_BASE_URL may point at a different API than the one your MQTT pipeline writes to — purge ran against empty tables."
+          : "";
       setPurgeMsg(
-        `Cleared ${out.deleted_latest ?? 0} current row(s) and ${out.deleted_events ?? 0} history row(s).`,
+        `Cleared ${latest} current row(s) and ${events} history row(s).${fogNote}${sqsNote}${mismatchHint}`,
       );
     } catch (e: unknown) {
       setPurgeMsg(e instanceof Error ? e.message : String(e));

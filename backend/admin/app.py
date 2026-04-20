@@ -1,6 +1,10 @@
 """
 Admin API — destructive operations for lab demos (optional X-Admin-Key).
 POST /admin/purge — purge SQS (in-flight messages), then wipe events + latest tables.
+
+Also wipes FogStateTable when STATE_TABLE is set: IoTFogFunction keeps a per-fleet
+snapshot in that table; if only events/latest are cleared, the next MQTT summary
+would re-upsert every old bin_id/zone from restored fog state.
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ sqs_client = boto3.client("sqs")
 
 EVENTS_TABLE = os.environ.get("EVENTS_TABLE", "")
 LATEST_TABLE = os.environ.get("LATEST_TABLE", "")
+STATE_TABLE = os.environ.get("STATE_TABLE", "").strip()
 QUEUE_URL = os.environ.get("QUEUE_URL", "")
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "").strip()
 
@@ -105,15 +110,16 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         sqs_purged = _purge_sqs()
         n_events = _purge_table(EVENTS_TABLE, ("bin_id", "event_sk"))
         n_latest = _purge_table(LATEST_TABLE, ("bin_id",))
+        n_fog_state = _purge_table(STATE_TABLE, ("fog_node_id",)) if STATE_TABLE else 0
     except Exception as e:  # noqa: BLE001
         return _response(500, {"error": str(e)})
 
-    return _response(
-        200,
-        {
-            "purged": True,
-            "deleted_events": n_events,
-            "deleted_latest": n_latest,
-            "sqs_purged": sqs_purged,
-        },
-    )
+    body: dict[str, Any] = {
+        "purged": True,
+        "deleted_events": n_events,
+        "deleted_latest": n_latest,
+        "sqs_purged": sqs_purged,
+    }
+    if STATE_TABLE:
+        body["deleted_fog_state"] = n_fog_state
+    return _response(200, body)

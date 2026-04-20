@@ -129,7 +129,7 @@ https://xxxxxxxx.execute-api.eu-west-1.amazonaws.com/ingest
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/admin/purge` | Purge ingestion **SQS** queue, then delete **all** items in `waste-bin-events-v2` and `waste-bin-latest` |
+| POST | `/admin/purge` | Purge ingestion **SQS** queue, then delete **all** items in `waste-bin-events-v2`, `waste-bin-latest`, and **`FogStateTable`** (MQTT fog snapshot; skipping it caused old zones to be written back on the next summary) |
 
 **Optional security:** template parameter **`AdminApiKey`** — if non-empty at deploy time, clients must send header **`X-Admin-Key: <same value>`**. The Vite dashboard can use **`VITE_ADMIN_API_KEY`** in `frontend/.env` to match.
 

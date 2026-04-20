@@ -29,7 +29,12 @@ _CORS = {
 
 
 def api_response(status: int, body: Any) -> dict[str, Any]:
-    headers = {"Content-Type": "application/json", **_CORS}
+    headers = {
+        "Content-Type": "application/json",
+        # Prevent browsers / intermediaries from caching JSON reads (stale bins after purge).
+        "Cache-Control": "no-store, max-age=0, must-revalidate",
+        **_CORS,
+    }
     return {
         "statusCode": status,
         "headers": headers,

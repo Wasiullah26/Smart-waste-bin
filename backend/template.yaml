@@ -228,6 +228,7 @@ Resources:
         Variables:
           EVENTS_TABLE: !Ref WasteBinEventsTableV2
           LATEST_TABLE: !Ref WasteBinLatestTable
+          STATE_TABLE: !Ref FogStateTable
           QUEUE_URL: !Ref IngestionQueue
           ADMIN_API_KEY: !Ref AdminApiKey
       Events:

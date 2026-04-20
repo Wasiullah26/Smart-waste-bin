@@ -1,5 +1,8 @@
 import type { BinEvent, BinLatest } from "../types";
 
+/** Avoid stale dashboard data: browsers may cache cross-origin GETs to API Gateway. */
+const NO_CACHE: RequestInit = { cache: "no-store" };
+
 function baseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL ?? "";
   return raw.replace(/\/+$/, "");
@@ -12,7 +15,7 @@ async function getJson<T>(path: string): Promise<T> {
       "VITE_API_BASE_URL is not set. Create frontend/.env with VITE_API_BASE_URL=https://your-api.execute-api.region.amazonaws.com",
     );
   }
-  const res = await fetch(`${b}${path}`);
+  const res = await fetch(`${b}${path}`, NO_CACHE);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
@@ -59,6 +62,7 @@ export async function postAdminPurge(): Promise<{
   purged?: boolean;
   deleted_events?: number;
   deleted_latest?: number;
+  deleted_fog_state?: number;
   sqs_purged?: boolean;
 }> {
   const b = baseUrl();
@@ -74,6 +78,7 @@ export async function postAdminPurge(): Promise<{
     method: "POST",
     headers,
     body: "{}",
+    ...NO_CACHE,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -83,6 +88,7 @@ export async function postAdminPurge(): Promise<{
     purged?: boolean;
     deleted_events?: number;
     deleted_latest?: number;
+    deleted_fog_state?: number;
     sqs_purged?: boolean;
   }>;
 }
@@ -99,6 +105,7 @@ export async function postIngest(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    ...NO_CACHE,
   });
   if (!res.ok) {
     const text = await res.text();
